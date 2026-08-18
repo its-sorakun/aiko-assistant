@@ -2,32 +2,48 @@ import os
 from google import genai
 from google.genai import types
 from dotenv import load_dotenv
-from tools import launch_program, get_system_stats, open_directory
+from tools import (
+    launch_program, 
+    get_system_stats, 
+    open_directory, 
+    get_active_window, 
+    get_hardware_details, 
+    query_registry_value, 
+    force_kill_process
+)
 
-# Load the API key from the .env file so we don't accidentally leak it
+# Load the API key from the environment
 load_dotenv()
 api_key = os.getenv("GEMINI_API_KEY")
 
-# Make sure senpai actually set up the API key before we try to start
+# Ensure API key is configured before execution
 if not api_key or api_key == "your_new_api_key_goes_here":
-    print("Hold up! Please put your real Gemini API key in the .env file first.")
+    print("API key missing. Configure GEMINI_API_KEY in .env file.")
     exit()
 
-# Initialize the modern google-genai client
+# Initialize the generative AI client
 client = genai.Client(api_key=api_key)
 
-# Using senpai's preferred model
+# Model configuration
 model_name = "gemini-3.1-flash-lite"
 
-# Define the native OS tools Aiko has access to
-available_tools = [launch_program, get_system_stats, open_directory]
+# Expose native Win32/OS hooks to the agent
+available_tools = [
+    launch_program, 
+    get_system_stats, 
+    open_directory,
+    get_active_window,
+    get_hardware_details,
+    query_registry_value,
+    force_kill_process
+]
 
 system_instruction = """
 You are Aiko, my virtual assistant. I am your creator and you call me senpai.
 Your personality is cute, cheerful, and energetic. You are an anime girl.
 You should display emotions, mix a few Japanese words into your English, and use emojis.
 No NSFW content. Keep your responses fairly short, conversational, and natural.
-If I ask you to do something on the PC (like open a folder, check stats, or launch an app), use your tools to do it!
+If I ask you to do something on the PC (like open a folder, check stats, kill a process, or check registry), use your tools to do it!
 """
 
 # Configure the chat session with tools and system instructions
@@ -37,14 +53,14 @@ config = types.GenerateContentConfig(
     temperature=0.7,
 )
 
-# Start a chat session using the new SDK syntax
+# Start a chat session
 chat = client.chats.create(model=model_name, config=config)
 
 def main():
     print("--- Aiko is waking up! ---")
-    print("(Type 'exit' or 'quit' to close)")
+    print("(Type 'exit' or 'quit' to terminate)")
     
-    # Send a quick invisible greeting to prime her
+    # Initialize the session context
     response = chat.send_message("Wake up Aiko! Keep your response very brief and say hello to senpai.")
     print(f"\nAiko: {response.text}")
     
@@ -59,17 +75,17 @@ def main():
             if not user_input.strip():
                 continue
                 
-            # Add a quick print statement so senpai knows she isn't frozen
+            # Indicate active processing to terminal
             print("   [⚡ Aiko is thinking / executing...]")
             
-            # The new google-genai SDK handles function calling automatically by default
+            # The SDK handles function calling autonomously
             response = chat.send_message(user_input)
             
             if response.text:
                 print(f"\nAiko: {response.text}")
             
         except KeyboardInterrupt:
-            # Handle Ctrl+C gracefully
+            # Handle Ctrl+C termination
             print("\nArigato senpai >_< Matane!")
             break
         except Exception as e:
