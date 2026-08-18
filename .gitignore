@@ -13,3 +13,4 @@ __pycache__/
 # other stuff
 assistant.md
 ztest.py
+test_vscode.py

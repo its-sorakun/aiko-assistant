@@ -9,7 +9,8 @@ from tools import (
     get_active_window, 
     get_hardware_details, 
     query_registry_value, 
-    force_kill_process
+    force_kill_process,
+    read_active_window_content
 )
 
 # Load the API key from the environment
@@ -35,7 +36,8 @@ available_tools = [
     get_active_window,
     get_hardware_details,
     query_registry_value,
-    force_kill_process
+    force_kill_process,
+    read_active_window_content
 ]
 
 system_instruction = """

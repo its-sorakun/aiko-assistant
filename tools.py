@@ -213,3 +213,82 @@ def force_kill_process(process_name: str) -> str:
         return f"Termination signal sent. {process_name} has been forcefully killed."
     except subprocess.CalledProcessError as e:
         return f"Failed to kill {process_name}. Process may not be running or execution requires elevated privileges."
+
+def read_active_window_content() -> str:
+    """
+    Attempt to read the contents of the currently active editor window.
+    Instead of relying on bloated UI automation frameworks, this intercepts the DWM Z-order 
+    to extract the window title, parses the active filename, and pulls the raw bytes directly from the physical disk.
+    """
+    user32 = ctypes.windll.user32
+    hwnd = user32.GetForegroundWindow()
+    GW_HWNDNEXT = 2
+    
+    # Target known IDE/Editor signatures in window titles
+    editor_signatures = ["Visual Studio Code", "Notepad", "Sublime Text", "Cursor"]
+    found_title = None
+    
+    # Crawl the Z-order to hunt down the nearest running code editor
+    for _ in range(50):
+        if not hwnd: break
+        
+        # Only check visible, non-minimized windows
+        if user32.IsWindowVisible(hwnd) and not user32.IsIconic(hwnd):
+            length = user32.GetWindowTextLengthW(hwnd)
+            if length > 0:
+                title_buf = ctypes.create_unicode_buffer(length + 1)
+                user32.GetWindowTextW(hwnd, title_buf, length + 1)
+                window_title = title_buf.value
+                
+                # Check if this window belongs to a known editor
+                if any(sig in window_title for sig in editor_signatures):
+                    found_title = window_title
+                    break
+                    
+        hwnd = user32.GetWindow(hwnd, GW_HWNDNEXT)
+        
+    if not found_title:
+        return "Could not find any active (non-minimized) code editors in the Z-order stack to read from."
+        
+    # Parse common editor window title structures (e.g. "filename.py - workspace - Visual Studio Code" or "workspace - filename.py")
+    parts = found_title.split(" - ")
+    if not parts:
+        return f"Window title too ambiguous to deduce filename: {found_title}"
+        
+    # The filename could be anywhere in the title depending on the IDE config.
+    # iterate through the parts and find the first one that looks like a valid file (contains an extension or dot).
+    raw_filename = None
+    for part in parts:
+        clean_part = part.strip().lstrip('*') # Strip the unsaved changes asterisk
+        if "." in clean_part or clean_part.startswith("."):
+            raw_filename = clean_part
+            break
+            
+    if not raw_filename:
+        return f"Target IDE window '{found_title}' does not appear to have an active file open (could not extract a valid filename)."
+        
+    # Crawl the local filesystem to find the physical file
+    target_path = None
+    search_root = os.getcwd()
+    
+    for root, _, files in os.walk(search_root):
+        # Skip heavy directories like .git or __pycache__ for speed
+        if ".git" in root or "__pycache__" in root:
+            continue
+        if raw_filename in files:
+            target_path = os.path.join(root, raw_filename)
+            break
+            
+    if not target_path:
+        return f"Extracted '{raw_filename}' from IDE title, but the physical file is missing from {search_root}."
+        
+    # Read the raw file directly off the disk
+    try:
+        with open(target_path, "r", encoding="utf-8") as f:
+            content = f.read()
+            # Truncate to prevent token overflow on massive files
+            if len(content) > 2000:
+                content = content[:2000] + "\n... [FILE TRUNCATED]"
+            return f"Deduced physical path from Z-order: {target_path}\n\n[FILE CONTENTS]\n{content}"
+    except Exception as e:
+        return f"Located {target_path} but kernel denied read access: {e}"
