@@ -14,3 +14,4 @@ __pycache__/
 assistant.md
 ztest.py
 test_vscode.py
+test_smtc.ps1
