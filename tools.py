@@ -3,23 +3,26 @@ import psutil
 import ctypes
 import subprocess
 import winreg
+import shutil
 
 # hooking directly into Windows to do things the native way.
 
 def launch_program(app_name: str) -> str:
     """
-    Attempt to launch a program natively. 
-    First relies on the shell PATH. If that fails, aggressively crawls the Windows 
-    Registry Uninstall keys to hunt down the physical executable path.
+    Attempt to launch a program natively without relying on the shell 'start' command,
+    which triggers ugly GUI error dialogs if the binary is missing.
+    Resolves execution via PATH, Uninstall registries, and App Paths directly.
     """
-    # Attempt 1: The standard shell start command (relies on PATH)
-    # Using subprocess.run with capture_output hides the ugly "system cannot find the file" error
-    try:
-        subprocess.run(f'start "" "{app_name}"', shell=True, capture_output=True, timeout=2)
-    except subprocess.TimeoutExpired:
-        pass
+    # 1. Native PATH resolution
+    executable = shutil.which(app_name)
+    if executable:
+        try:
+            subprocess.Popen([executable], creationflags=0x00000008, close_fds=True)
+            return f"Launched {app_name} natively from PATH: {executable}"
+        except Exception as e:
+            return f"Failed to execute {executable}: {e}"
 
-    # Attempt 2: Deep Registry Crawl for the physical executable
+    # 2. Deep Registry Crawl for physical executable
     search_hives = [
         (winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall"),
         (winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall"),
@@ -52,18 +55,25 @@ def launch_program(app_name: str) -> str:
             
     if found_path and os.path.exists(found_path):
         try:
-            # Launch detached GUI process cleanly so it doesn't hold onto our terminal handles
-            # 0x00000008 is DETACHED_PROCESS
-            subprocess.Popen(
-                [found_path], 
-                creationflags=0x00000008, 
-                close_fds=True
-            )
+            # Launch detached GUI process cleanly
+            subprocess.Popen([found_path], creationflags=0x00000008, close_fds=True)
             return f"Located and launched {app_name} via Registry: {found_path}"
         except Exception as e:
             return f"Found {app_name} at {found_path} but kernel execution failed: {e}"
             
-    return f"Triggered shell launch for {app_name}. If it failed to appear, the binary is missing from PATH and Registry."
+    # 3. Direct App Paths Registry fallback (mimics 'start' behavior without the error dialog)
+    app_exe = app_name if app_name.lower().endswith(".exe") else f"{app_name}.exe"
+    for hive in [winreg.HKEY_LOCAL_MACHINE, winreg.HKEY_CURRENT_USER]:
+        try:
+            with winreg.OpenKey(hive, rf"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\{app_exe}", 0, winreg.KEY_READ) as key:
+                app_path, _ = winreg.QueryValueEx(key, "")
+                if os.path.exists(app_path):
+                    subprocess.Popen([app_path], creationflags=0x00000008, close_fds=True)
+                    return f"Launched via App Paths: {app_path}"
+        except OSError:
+            continue
+            
+    return f"Failed to locate {app_name} in PATH, Uninstall Registries, or App Paths."
 
 def get_system_stats() -> str:
     """
@@ -125,12 +135,20 @@ def get_active_window() -> str:
     # Fallback in case the terminal wrapper has a different PID (like Windows Terminal)
     # Check if window is visible and has a title to find a legitimate background app
     if pid.value == current_pid or "cmd.exe" in psutil.Process(pid.value).name().lower() or "windowsterminal.exe" in psutil.Process(pid.value).name().lower():
-        # Iterate through Z-order until a valid, visible window with text is found
+        # Crawl down the DWM Z-order stack
         while hwnd:
             hwnd = user32.GetWindow(hwnd, GW_HWNDNEXT)
             if user32.IsWindowVisible(hwnd):
+                
+                # If we hit the bare desktop shell, they are looking at the desktop!
+                cls_buf = ctypes.create_unicode_buffer(256)
+                user32.GetClassNameW(hwnd, cls_buf, 256)
+                if cls_buf.value in ("WorkerW", "Progman"):
+                    return "The Windows Desktop (No active applications)"
+                
+                # Otherwise, look for a non-minimized window with a title
                 length = user32.GetWindowTextLengthW(hwnd)
-                if length > 0:
+                if length > 0 and not user32.IsIconic(hwnd):
                     break
 
     if not hwnd:
