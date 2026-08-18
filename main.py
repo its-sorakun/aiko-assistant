@@ -62,7 +62,7 @@ def main():
             # Add a quick print statement so senpai knows she isn't frozen
             print("   [⚡ Aiko is thinking / executing...]")
             
-            # The new google-genai SDK handles function calling automatically by default!
+            # The new google-genai SDK handles function calling automatically by default
             response = chat.send_message(user_input)
             
             if response.text:

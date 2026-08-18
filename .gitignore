@@ -9,3 +9,6 @@ ai/
 # Python cache
 __pycache__/
 *.pyc
+
+# other stuff
+assistant.md

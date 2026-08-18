@@ -1,8 +1,7 @@
 import os
 import psutil
 
-# Aiko's hands and eyes in the OS.
-# We're hooking directly into Windows to do things the native way.
+# hooking directly into Windows to do things the native way.
 
 def launch_program(app_name: str) -> str:
     """
