@@ -4,6 +4,7 @@ import ctypes
 import subprocess
 import winreg
 import shutil
+import asyncio
 
 # hooking directly into Windows to do things the native way.
 
@@ -292,3 +293,48 @@ def read_active_window_content() -> str:
             return f"Deduced physical path from Z-order: {target_path}\n\n[FILE CONTENTS]\n{content}"
     except Exception as e:
         return f"Located {target_path} but kernel denied read access: {e}"
+
+def control_system_media(action: str = "info") -> str:
+    """
+    Control or inspect the currently playing system media via WinRT System Media Transport Controls (SMTC).
+    Bypasses high-level GUI automation by hooking directly into the Windows OS media pipeline.
+    Action can be: 'info', 'play', 'pause', 'next', 'previous'.
+    """
+    try:
+        from winsdk.windows.media.control import GlobalSystemMediaTransportControlsSessionManager
+    except ImportError:
+        return "The 'winsdk' Python projection for WinRT is missing. Execute 'pip install winsdk'."
+
+    async def _manage_media():
+        manager = await GlobalSystemMediaTransportControlsSessionManager.request_async()
+        session = manager.get_current_session()
+        
+        if not session:
+            return "No active media session hooked into the Windows DWM."
+            
+        action_lower = action.lower()
+        if action_lower == "play":
+            await session.try_play_async()
+            return "Sent Play command to the underlying media session."
+        elif action_lower == "pause":
+            await session.try_pause_async()
+            return "Sent Pause command to the underlying media session."
+        elif action_lower == "next":
+            await session.try_skip_next_async()
+            return "Sent Skip Next command to the underlying media session."
+        elif action_lower == "previous":
+            await session.try_skip_previous_async()
+            return "Sent Skip Previous command to the underlying media session."
+        
+        # Default fallback is 'info'
+        properties = await session.try_get_media_properties_async()
+        title = properties.title
+        artist = properties.artist
+        app = session.source_app_user_model_id
+        return f"Currently playing: '{title}' by {artist} (Host Process: {app})"
+        
+    try:
+        return asyncio.run(_manage_media())
+    except Exception as e:
+        return f"Failed to interface with WinRT SMTC APIs: {e}"
+

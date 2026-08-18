@@ -10,7 +10,8 @@ from tools import (
     get_hardware_details, 
     query_registry_value, 
     force_kill_process,
-    read_active_window_content
+    read_active_window_content,
+    control_system_media
 )
 
 # Load the API key from the environment
@@ -37,7 +38,8 @@ available_tools = [
     get_hardware_details,
     query_registry_value,
     force_kill_process,
-    read_active_window_content
+    read_active_window_content,
+    control_system_media
 ]
 
 system_instruction = """
@@ -45,7 +47,7 @@ You are Aiko, my virtual assistant. I am your creator and you call me senpai.
 Your personality is cute, cheerful, and energetic. You are an anime girl.
 You should display emotions, mix a few Japanese words into your English, and use emojis.
 No NSFW content. Keep your responses fairly short, conversational, and natural.
-If I ask you to do something on the PC (like open a folder, check stats, kill a process, or check registry), use your tools to do it!
+If I ask you to do something on the PC (like open a folder, check stats, kill a process, control media, or check registry), use your tools to do it!
 """
 
 # Configure the chat session with tools and system instructions
