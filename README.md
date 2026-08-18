@@ -1,23 +1,59 @@
 # Aiko: Native OS-Aware Assistant
 
-Aiko is an experimental, event-driven assistant built to bypass high-level GUI automation frameworks and interface directly with underlying Windows OS mechanisms. 
+Aiko is an experimental, event-driven virtual assistant designed to explore the intersection between modern Large Language Model (LLM) function calling and low-level Windows OS mechanics. 
 
-The purpose of this project is to investigate how LLM function calling can be mapped onto raw OS APIs. Rather than relying on fragile UI scraping, simulated inputs, or bloated orchestration libraries, the implementation drops down to Win32, WMI, and WinRT interfaces to manipulate the environment natively.
+Instead of treating the operating system as a black box and interacting via high-level graphical UI automation (like simulated mouse clicks or fragile OCR scraping), the project is engineered to drop down to the underlying mechanisms. Aiko interfaces directly with the native Win32 API, Windows Management Instrumentation (WMI), and the asynchronous Windows Runtime (WinRT).
 
-## Implementation Details
+## How It Works (The Reasoning Engine)
 
-- **Autonomous Tool Execution**: Connects Gemini function calling directly to local Python API bindings.
-- **DWM Z-Order Interception**: Ignores the invoking terminal by traversing the Desktop Window Manager stack downward, identifying the true foreground application.
-- **Direct Memory & Thermal Probing**: Reads hardware vitals via `psutil` and attempts user-space ACPI hooks through Windows Management Instrumentation (WMI).
-- **Native Registry Resolution**: Discovers executable paths natively via Windows Registry hives rather than relying on environment variables or shell searches.
-- **WinRT Media Hooking**: Hooks into the asynchronous WinRT System Media Transport Controls (SMTC) to read and manipulate the global audio pipeline.
+At the core of Aiko is the `google.genai` SDK, leveraging the Gemini 3.1 Flash Lite model.
 
-## Usage
+Unlike legacy assistant scripts that rely on hardcoded `if/else` intent routing or regex string matching, Aiko delegates all reasoning to the generative model. 
 
-Clone the repository and install the native bindings:
-```bash
-pip install -r requirements.txt
+1. **Tool Schema Injection**: The local Python runtime defines a schema of available OS hooks (e.g., `control_system_media`, `get_active_window`, `force_kill_process`) and passes this to Gemini.
+2. **Dynamic Decision Making**: When a natural language command is provided (e.g., "Skip this song" or "Why is my PC running hot?"), Gemini determines exactly which native hook to invoke and extracts the necessary arguments.
+3. **Local Execution**: Gemini returns a hidden JSON payload to the local script. The Python runtime executes the Win32/WinRT bindings locally—Gemini never has direct access to the host machine.
+4. **Contextual Feedback**: The raw execution results are passed back to Gemini to format a natural, contextual response.
+
+## Core Capabilities & Implementation Details
+
+- **DWM Z-Order Interception**: When queried about the user's active context, Aiko bypasses the invoking terminal. By traversing the Desktop Window Manager (DWM) Z-order stack downwards, she can ignore terminal wrappers and identify the true underlying foreground application, even intercepting bare desktop shells (`WorkerW`, `Progman`).
+- **WinRT Media Hooking (SMTC)**: Media control completely bypasses simulated keyboard media keys. Aiko hooks into the asynchronous WinRT System Media Transport Controls (SMTC) via the `winsdk` projection. This allows her to iterate through background audio sessions and pipe transport signals specifically to hidden background processes (like Spotify), bypassing dominant global media sessions.
+- **Native Registry Resolution**: Applications are launched natively by crawling Windows Registry hives (`SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall` and `WOW6432Node`) to discover physical executable paths, rather than relying on environment variables or the `start` shell command.
+- **Direct Memory & Thermal Probing**: Hardware vitals are read via `psutil`. Thermal data extraction is attempted through Windows Management Instrumentation (WMI) ACPI hooks, exposing the limitations of user-space thermal diode access without Ring-0 drivers.
+- **Kernel-Level Termination**: Applications are closed by dropping kernel-level termination signals (`taskkill /F`), forcefully removing hung or unresponsive processes from memory rather than issuing polite GUI close requests.
+
+## Configuration & Usage
+
+### Prerequisites
+- Python 3.10+
+- Windows 10 or Windows 11 (required for WinRT SMTC hooks)
+- A Gemini API Key from Google AI Studio
+
+### Installation
+
+1. Clone the repository to your local machine.
+2. Install the required native bindings and dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
+   *(Note: The `winsdk` package may trigger local C++ compilation if pre-compiled wheels are unavailable for your specific Python architecture. This will spike CPU usage temporarily).*
+
+### Configuration
+
+Create a `.env` file in the root directory of the project and insert your API key:
+```env
+GEMINI_API_KEY=your_actual_api_key_here
 ```
-Configure `GEMINI_API_KEY` in a local `.env` file, and execute `python main.py`.
 
-For a breakdown of the specific kernel and user-space hooks employed, refer to [INTERNALS.md](INTERNALS.md).
+### Execution
+
+Execute the main script from your terminal:
+```bash
+python main.py
+```
+Aiko will initialize the chat session. You can immediately begin interacting via natural language commands to inspect your system, launch applications, or manipulate background media.
+
+---
+
+For a highly verbose breakdown of the specific kernel and user-space hooks employed, refer to [INTERNALS.md](INTERNALS.md).
