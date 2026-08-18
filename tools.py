@@ -20,8 +20,8 @@ def get_system_stats() -> str:
     """
     Check the PC's vitals: CPU and RAM usage.
     """
-    # Checking CPU load over a quick 1-second interval
-    cpu_usage = psutil.cpu_percent(interval=1)
+    # Checking CPU load over a quick 0.1-second interval to avoid hanging
+    cpu_usage = psutil.cpu_percent(interval=0.1)
     
     # Grab memory info and convert bytes to gigabytes for readability
     ram = psutil.virtual_memory()

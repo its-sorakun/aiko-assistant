@@ -1,5 +1,6 @@
 import os
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 from dotenv import load_dotenv
 from tools import launch_program, get_system_stats, open_directory
 
@@ -12,10 +13,11 @@ if not api_key or api_key == "your_new_api_key_goes_here":
     print("Hold up! Please put your real Gemini API key in the .env file first.")
     exit()
 
-genai.configure(api_key=api_key)
+# Initialize the modern google-genai client
+client = genai.Client(api_key=api_key)
 
-# We're using the brand new 3.7 flash model for snappy responses and solid tool usage
-model_name = "gemini-3.7-flash"
+# Using senpai's preferred model
+model_name = "gemini-3.1-flash-lite"
 
 # Define the native OS tools Aiko has access to
 available_tools = [launch_program, get_system_stats, open_directory]
@@ -28,23 +30,23 @@ No NSFW content. Keep your responses fairly short, conversational, and natural.
 If I ask you to do something on the PC (like open a folder, check stats, or launch an app), use your tools to do it!
 """
 
-# Initialize the AI with her personality and her toolkit
-model = genai.GenerativeModel(
-    model_name=model_name,
+# Configure the chat session with tools and system instructions
+config = types.GenerateContentConfig(
+    system_instruction=system_instruction,
     tools=available_tools,
-    system_instruction=system_instruction
+    temperature=0.7,
 )
 
-# Start a chat session and let the SDK handle calling the functions automatically
-chat = model.start_chat(enable_automatic_function_calling=True)
+# Start a chat session using the new SDK syntax
+chat = client.chats.create(model=model_name, config=config)
 
 def main():
     print("--- Aiko is waking up! ---")
     print("(Type 'exit' or 'quit' to close)")
     
     # Send a quick invisible greeting to prime her
-    chat.send_message("Wake up Aiko! Keep your response very brief and say hello to senpai.")
-    print(f"\nAiko: {chat.history[-1].parts[0].text}")
+    response = chat.send_message("Wake up Aiko! Keep your response very brief and say hello to senpai.")
+    print(f"\nAiko: {response.text}")
     
     while True:
         try:
@@ -57,10 +59,14 @@ def main():
             if not user_input.strip():
                 continue
                 
-            # Send the message to Aiko and let her decide what to do
+            # Add a quick print statement so senpai knows she isn't frozen
+            print("   [⚡ Aiko is thinking / executing...]")
+            
+            # The new google-genai SDK handles function calling automatically by default!
             response = chat.send_message(user_input)
             
-            print(f"\nAiko: {response.text}")
+            if response.text:
+                print(f"\nAiko: {response.text}")
             
         except KeyboardInterrupt:
             # Handle Ctrl+C gracefully
