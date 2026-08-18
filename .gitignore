@@ -1,0 +1,11 @@
+# Security
+.env
+
+# Legacy backup stuff
+aims.py
+json/
+ai/
+
+# Python cache
+__pycache__/
+*.pyc
