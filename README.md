@@ -1,8 +1,20 @@
 # Aiko: Native OS-Aware Assistant
 
-Aiko is an experimental, event-driven virtual assistant designed to explore the intersection between modern Large Language Model (LLM) function calling and low-level Windows OS mechanics. 
+Aiko is an experimental, event-driven virtual AI assistant designed to explore the intersection between modern Large Language Model (LLM) function calling and low-level Windows OS mechanics. 
 
 Instead of treating the operating system as a black box and interacting via high-level graphical UI automation (like simulated mouse clicks or fragile OCR scraping), the project is engineered to drop down to the underlying mechanisms. Aiko interfaces directly with the native Win32 API, Windows Management Instrumentation (WMI), and the asynchronous Windows Runtime (WinRT).
+
+> For a highly verbose breakdown of the specific kernel and user-space hooks employed, refer to [INTERNALS.md](INTERNALS.md).
+
+## What Aiko Can Do
+
+Because the assistant is hooked directly into the OS, it exposes several core features:
+- **System Media Inspection**: Extracts currently playing audio metadata directly from the WinRT DWM media session.
+- **Background Media Control**: Sends transport controls (play/pause/skip) directly to specific background processes, bypassing the dominant global media session.
+- **Hardware Telemetry**: Probes WMI ACPI thermal zones and evaluates memory/CPU utilization.
+- **Native Application Launching**: Resolves physical executables via Registry Uninstall hives and spawns them as detached processes.
+- **Kernel-Level Process Termination**: Drops `taskkill /F` signals to forcefully clear hung or unresponsive processes from memory.
+- **Context-Aware File Reading**: Crawls the Z-order stack to identify the active code editor, parses the window title, and reads the raw file from disk.
 
 ## How It Works (The Reasoning Engine)
 
@@ -53,7 +65,3 @@ Execute the main script from your terminal:
 python main.py
 ```
 Aiko will initialize the chat session. You can immediately begin interacting via natural language commands to inspect your system, launch applications, or manipulate background media.
-
----
-
-For a highly verbose breakdown of the specific kernel and user-space hooks employed, refer to [INTERNALS.md](INTERNALS.md).
