@@ -1,3 +1,7 @@
+# Python cache
+__pycache__/
+*.pyc
+
 # Security
 .env
 
@@ -5,10 +9,6 @@
 aims.py
 json/
 ai/
-
-# Python cache
-__pycache__/
-*.pyc
 
 # other stuff
 assistant.md
