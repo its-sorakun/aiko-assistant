@@ -4,6 +4,7 @@ from .telemetry import get_system_stats, get_hardware_details
 from .windowing import get_active_window, read_active_window_content, open_directory
 from .registry import query_registry_value
 from .media import control_system_media
+from .power import manage_power_state
 
 __all__ = [
     "launch_program", 
@@ -14,5 +15,6 @@ __all__ = [
     "query_registry_value", 
     "force_kill_process",
     "read_active_window_content",
-    "control_system_media"
+    "control_system_media",
+    "manage_power_state"
 ]
