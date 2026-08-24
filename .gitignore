@@ -16,3 +16,12 @@ ztest.py
 test_vscode.py
 tools_backup.py
 test_smtc.ps1
+
+# Visual Studio Build Artifacts (C++ cpu_monitor)
+.vs/
+x64/
+Debug/
+Release/
+*.obj
+*.pdb
+*.ilk
