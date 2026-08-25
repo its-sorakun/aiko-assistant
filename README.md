@@ -1,6 +1,6 @@
 # Aiko: Native OS-Aware Assistant
 
-Aiko is an experimental, event-driven virtual AI assistant designed to explore the intersection between modern Large Language Model (LLM) function calling and low-level Windows OS mechanics. 
+Aiko is an experimental, event-driven virtual assistant designed to explore the intersection between modern Large Language Model (LLM) function calling and low-level Windows OS mechanics. 
 
 Instead of treating the operating system as a black box and interacting via high-level graphical UI automation (like simulated mouse clicks or fragile OCR scraping), the project is engineered to drop down to the underlying mechanisms. Aiko interfaces directly with the native Win32 API, Windows Management Instrumentation (WMI), and the asynchronous Windows Runtime (WinRT).
 
