@@ -41,6 +41,7 @@ Unlike legacy assistant scripts that rely on hardcoded `if/else` intent routing 
 - Python 3.10+
 - Windows 10 or Windows 11 (required for WinRT SMTC hooks)
 - A Gemini API Key from Google AI Studio
+- For temperature polling: AMD Ryzen CPU and AMD Ryzen Master Monitoring SDK installed on the host system
 
 ### Installation
 
