@@ -29,8 +29,39 @@ Modern media control is routed through the asynchronous WinRT pipeline rather th
 
 Hardware telemetry is gathered by bypassing high-level wrappers and querying the Common Information Model (CIM) and Windows Management Instrumentation (WMI).
 - Central processing and memory metrics are extracted natively.
-- For thermal data, direct probes of ACPI thermal zones (`MSApi_ThermalZoneTemperature`) in the `root/wmi` namespace are attempted. Such operations expose a fundamental limitation of the Windows user-space: without a Ring-0 kernel driver hooking the Super I/O chip, desktop motherboards block user-space thermal diode access.
-- Native PowerShell `Get-CimInstance` queries are executed, parsing the raw output to expose underlying hardware IDs and manufacturers.
+- For thermal data, direct probes of user-space ACPI thermal zones (`MSApi_ThermalZoneTemperature`) fail on custom motherboards due to a lack of standard ACPI routing. To circumvent this Ring-3 sandbox limitation, a custom C++ daemon (`cpu_monitor`) is deployed.
+- The daemon dynamically loads the AMD Ryzen Master SDK (`Platform.dll`) to establish a persistent session with the official AMD Ring-0 kernel driver (`AMDRyzenMasterDriver.sys`).
+- To avoid the severe CPU penalty of cold-booting the kernel session and querying the hardware System Management Unit (SMU) upon every telemetry request, the C++ daemon is designed as a persistent background process. It polls the hardware natively and exposes the live temperature via a Memory Mapped File (Shared Memory), allowing the Python runtime to read the sensors instantaneously with zero overhead.
+- Native PowerShell `Get-CimInstance` queries remain in place as a generic fallback for exposing underlying hardware IDs and manufacturers.
+
+### Telemetry Data Flow Architecture
+
+```mermaid
+graph TD
+    subgraph Ring3 [User-Space - Ring 3]
+        Aiko[Python Runtime <br/> telemetry.py]
+        Daemon[C++ Daemon <br/> cpu_monitor.exe]
+        MMF[(Memory Mapped File <br/> Shared Memory)]
+        PlatformDLL[Platform.dll / Device.dll <br/> AMD SDK]
+        
+        Aiko -- "Reads Instantaneously <br/> (Zero Overhead)" --> MMF
+        Daemon -- "Writes Temperature <br/> (1000ms Polling)" --> MMF
+        Daemon -- "Dynamically Loads" --> PlatformDLL
+    end
+
+    subgraph Ring0 [Kernel-Space - Ring 0]
+        SysDriver[AMDRyzenMasterDriver.sys <br/> Trusted Kernel Service]
+        PlatformDLL -- "DeviceIoControl (IOCTL)" --> SysDriver
+    end
+    
+    subgraph Silicon [Physical Hardware]
+        SMU[System Management Unit]
+        CPUDiodes[CPU Thermal Diodes]
+        
+        SysDriver -- "PCIe / LPC Bus" --> SMU
+        SMU -- "Probes Hardware Registers" --> CPUDiodes
+    end
+```
 
 ## 5. Direct Process Termination
 **File:** `tools.py` -> `force_kill_process()`

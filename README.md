@@ -11,7 +11,7 @@ Instead of treating the operating system as a black box and interacting via high
 Because the assistant is hooked directly into the OS, it exposes several core features:
 - **System Media Inspection**: Extracts currently playing audio metadata directly from the WinRT DWM media session.
 - **Background Media Control**: Sends transport controls (play/pause/skip) directly to specific background processes, bypassing the dominant global media session.
-- **Hardware Telemetry**: Probes WMI ACPI thermal zones and evaluates memory/CPU utilization.
+- **Hardware Telemetry**: Evaluates memory/CPU utilization. Bypasses restrictive user-space WMI thermal zones by invoking a custom native C++ daemon (`cpu_monitor`). The daemon interfaces with the AMD Ryzen Master SDK Ring-0 driver to map physical CPU MSR sensors directly into shared memory, eliminating initialization latency during telemetry polling. *(Note: Core thermal polling currently requires an AMD processor and the official AMD Ryzen Master Monitoring SDK to be installed on the host system).*
 - **Native Application Launching**: Resolves physical executables via Registry Uninstall hives and spawns them as detached processes.
 - **Kernel-Level Process Termination**: Drops `taskkill /F` signals to forcefully clear hung or unresponsive processes from memory.
 - **Context-Aware File Reading**: Crawls the Z-order stack to identify the active code editor, parses the window title, and reads the raw file from disk.
