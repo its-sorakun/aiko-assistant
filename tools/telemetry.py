@@ -12,16 +12,27 @@ def get_system_stats() -> str:
     total_ram_gb = round(ram.total / (1024 ** 3), 1)
     used_ram_gb = round(ram.used / (1024 ** 3), 1)
     
-    # Attempt to read CPU temp natively via WMI ACPI Thermal Zones (often blocked in user-space)
-    cpu_temp = "N/A (Kernel blocked)"
+    # bypass user-space wmi limitations by reading the exact 8-byte memory block
+    # exposed by our background c++ daemon, which polls the smu via a ring-0 driver.
+    cpu_temp = "N/A (Daemon offline)"
     try:
-        cmd = ["powershell", "-NoProfile", "-Command", "Get-CimInstance -Namespace root/wmi -ClassName MSApi_ThermalZoneTemperature -ErrorAction Stop | Select-Object CurrentTemperature"]
-        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
-        if result.stdout.strip():
-            dk = int(result.stdout.strip().split()[-1])
-            celsius = (dk / 10.0) - 273.15
+        import mmap
+        import struct
+        
+        # -1 maps to the system paging file instead of a physical disk file
+        shmem = mmap.mmap(-1, 8, tagname="Aiko_CPU_Temp", access=mmap.ACCESS_READ)
+        
+        # the c++ daemon writes a double (8 bytes). 'd' unpacks it back to a python float.
+        raw_bytes = shmem.read(8)
+        celsius = struct.unpack('d', raw_bytes)[0]
+        
+        # 0.0 is our startup signal from the daemon before the first hardware poll
+        if celsius > 0.0:
             cpu_temp = f"{celsius:.1f}C"
+            
+        shmem.close()
     except Exception:
+        # fails instantly if the c++ daemon hasn't called CreateFileMapping yet
         pass
 
     # Extract GPU Temp natively via nvidia-smi (if NVIDIA driver is present)

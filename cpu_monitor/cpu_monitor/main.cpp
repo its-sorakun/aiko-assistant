@@ -93,8 +93,8 @@ int main(){
             std::cout << "failed to read CPU parameters, error code: " << iRet << std::endl;
         }
 
-        // sleep for 1000 milliseconds to prevent high CPU usage
-        Sleep(1000);
+        // sleep for 5000 milliseconds to prevent high CPU usage
+        Sleep(3000);
     }
 
     // cleanup shared memory
