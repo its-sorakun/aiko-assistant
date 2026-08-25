@@ -62,6 +62,50 @@ config = types.GenerateContentConfig(
 # Start a chat session
 chat = client.chats.create(model=model_name, config=config)
 
+def thermal_monitor_thread():
+    # polling loop running alongside aiko's chat loop to proactively warn the user.
+    # uses native winsdk toast notifications to bypass the blocking input() prompt in the terminal.
+    import time
+    import mmap
+    import struct
+    import winsdk.windows.ui.notifications as notifications
+
+    app_id = "{1AC14E77-02E7-4E5D-B744-2EB1AE5198B7}\\WindowsPowerShell\\v1.0\\powershell.exe"
+    
+    # State tracking to alert exactly when it crosses the threshold (edge-trigger)
+    is_overheating = False
+    warning_threshold = 89.0
+    reset_threshold = warning_threshold - 2.0  # Hysteresis: must drop 2 degrees below to reset
+
+    while True:
+        try:
+            shmem = mmap.mmap(-1, 8, tagname="Aiko_CPU_Temp", access=mmap.ACCESS_READ)
+            raw_bytes = shmem.read(8)
+            celsius = struct.unpack('d', raw_bytes)[0]
+            shmem.close()
+
+            # Trigger alert if it crosses the threshold that aren't already in an overheated state
+            if celsius >= warning_threshold and not is_overheating:
+                xml = notifications.ToastNotificationManager.get_template_content(notifications.ToastTemplateType.TOAST_TEXT02)
+                texts = xml.get_elements_by_tag_name("text")
+                texts[0].append_child(xml.create_text_node("Aiko Alert ⚠️"))
+                texts[1].append_child(xml.create_text_node(f"Senpai! CPU Temperature crossed {warning_threshold}°C (Currently: {celsius:.1f}°C)!"))
+                
+                notifier = notifications.ToastNotificationManager.create_toast_notifier(app_id)
+                toast = notifications.ToastNotification(xml)
+                notifier.show(toast)
+                
+                is_overheating = True
+                
+            # Only reset the state if the temp drops sufficiently below the threshold (prevent micro-bouncing spam)
+            elif celsius < reset_threshold and is_overheating:
+                is_overheating = False
+                
+        except Exception:
+            pass
+        
+        time.sleep(2)
+
 def main():
     # boot the c++ hardware monitoring daemon silently in the background before aiko wakes up
     import subprocess
@@ -79,6 +123,11 @@ def main():
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL
         )
+
+    # spin up the background thermal observer before blocking on chat
+    import threading
+    monitor = threading.Thread(target=thermal_monitor_thread, daemon=True)
+    monitor.start()
 
     print("--- Aiko is waking up! ---")
     print("(Type 'exit' or 'quit' to terminate)")
