@@ -22,6 +22,7 @@ int main(){
     }
 
     // hunt down the memory address of the GetPlatform function after loading it through Platform.dll
+    // to prevent DLL hell, both platform.dll and device.dll can be found in cpu_monitor/cpu_monitor/x64/Debug folder
     GetPlatformFunc GetPlatform = (GetPlatformFunc)GetProcAddress(hPlatform, "GetPlatform");
 
     if (GetPlatform == NULL){
@@ -38,7 +39,32 @@ int main(){
         return 1;
     }
 
-    std::cout << "successfully hooked and initiallized the AMD Ring-0 driver" << std::endl;
+    std::cout << "successfully hooked and initialized the AMD Ring-0 driver" << std::endl;
+
+    // get device manager from AMD Platform
+    IDeviceManager& rDeviceManager = rPlatform.GetIDeviceManager();
+
+    // ask the device manager for the CPU object (device Type: dtCPU, Index: 0)
+
+    ICPUEx* pCpu = (ICPUEx*)rDeviceManager.GetDevice(dtCPU, 0);
+
+    if(pCpu == NULL){
+        std::cout << "Failed to find the CPU device" << std::endl;
+        return 1;
+    }
+
+    // allocate a blank block of memory on the stack
+    CPUParameters stData;
+
+    // pass that memory block to the driver to be filled
+    int iRet = pCpu->GetCPUParameters(stData);
+
+    //  Check if it succeeded (0 usually means success in low-level C APIs)
+    if (iRet == 0) { 
+        std::cout << "Current CPU Temperature: " << stData.dTemperature << " Celsius" << std::endl;
+    } else {
+        std::cout << "Failed to read CPU parameters! Error Code: " << iRet << std::endl;
+    }
 
 
     return 0;
