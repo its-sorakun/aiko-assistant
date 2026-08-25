@@ -12,6 +12,9 @@ typedef IPlatform& (__stdcall* GetPlatformFunc)();
 int main(){
     std::cout << "Starting CPU Monitor" << std::endl;
 
+    // force OS window manager to hide the console window instantly to prevent taskbar clutter
+    ShowWindow(GetConsoleWindow(), SW_HIDE);
+
     // asks windows kernel memory manager for space, INVALID_HANDLE_VALUE to skip using secondary memory and reserve 8 bytes of RAM
     HANDLE hMapFile = CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0, 8, L"Aiko_CPU_Temp");
 

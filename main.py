@@ -63,6 +63,23 @@ config = types.GenerateContentConfig(
 chat = client.chats.create(model=model_name, config=config)
 
 def main():
+    # boot the c++ hardware monitoring daemon silently in the background before aiko wakes up
+    import subprocess
+    
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    daemon_dir = os.path.join(base_dir, "cpu_monitor", "cpu_monitor", "x64", "Debug")
+    daemon_path = os.path.join(daemon_dir, "cpu_monitor.exe")
+    
+    if os.path.exists(daemon_path):
+        # devnull pipe prevents c++ runtime from crashing when std::cout is called without a console
+        subprocess.Popen(
+            [daemon_path], 
+            creationflags=0x08000000, 
+            cwd=daemon_dir,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL
+        )
+
     print("--- Aiko is waking up! ---")
     print("(Type 'exit' or 'quit' to terminate)")
     

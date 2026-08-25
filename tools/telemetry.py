@@ -13,27 +13,29 @@ def get_system_stats() -> str:
     used_ram_gb = round(ram.used / (1024 ** 3), 1)
     
     # bypass user-space wmi limitations by reading the exact 8-byte memory block
-    # exposed by our background c++ daemon, which polls the smu via a ring-0 driver.
+    # exposed by background c++ daemon, which polls smu via a ring-0 driver.
     cpu_temp = "N/A (Daemon offline)"
     try:
         import mmap
         import struct
         
-        # -1 maps to the system paging file instead of a physical disk file
+        # -1 maps to system paging file instead of a physical disk file
         shmem = mmap.mmap(-1, 8, tagname="Aiko_CPU_Temp", access=mmap.ACCESS_READ)
         
-        # the c++ daemon writes a double (8 bytes). 'd' unpacks it back to a python float.
+        # c++ daemon writes a double (8 bytes). 'd' unpacks to a python float.
         raw_bytes = shmem.read(8)
         celsius = struct.unpack('d', raw_bytes)[0]
         
-        # 0.0 is our startup signal from the daemon before the first hardware poll
+        # 0.0 indicates startup signal from the daemon before the first hardware poll
         if celsius > 0.0:
             cpu_temp = f"{celsius:.1f}C"
             
         shmem.close()
     except Exception:
-        # fails instantly if the c++ daemon hasn't called CreateFileMapping yet
+        # shared memory missing indicates daemon is offline
+        # main.py is responsible for orchestrating the daemon lifecycle during boot
         pass
+
 
     # Extract GPU Temp natively via nvidia-smi (if NVIDIA driver is present)
     gpu_temp = "N/A"
