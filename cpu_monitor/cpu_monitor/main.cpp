@@ -12,10 +12,31 @@ typedef IPlatform& (__stdcall* GetPlatformFunc)();
 int main(){
     std::cout << "Starting CPU Monitor" << std::endl;
 
+    // asks windows kernel memory manager for space, INVALID_HANDLE_VALUE to skip using secondary memory and reserve 8 bytes of RAM
+    HANDLE hMapFile = CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0, 8, L"Aiko_CPU_Temp");
+
+    // Error Check the Kernel allocation
+    if (hMapFile == NULL) {
+        std::cout << "Failed to create Shared Memory! Error: " << GetLastError() << std::endl;
+        return 1;
+    }
+
+    // Map that Kernel memory into our C++ program as a usable Pointer
+    double* pSharedTemp = (double*)MapViewOfFile(hMapFile, FILE_MAP_ALL_ACCESS, 0, 0, 8);
+
+    // Error Check the mapping
+    if (pSharedTemp == NULL) {
+        std::cout << "Failed to map Shared Memory view!" << std::endl;
+        CloseHandle(hMapFile);
+        return 1;
+    }
+    
+    // write a default value into the RAM (0.0 means booting up)
+    *pSharedTemp = 0.0;
+
+
     // load platform.dll into the memory
     HMODULE hPlatform = LoadLibrary(L"Platform.dll"); 
-    
-    // prevent segmentation fault
     if(hPlatform == NULL){
         std:: cout << "Failed to load Platform.dll, check if it exits in the correct path";
         return 1;
@@ -56,17 +77,30 @@ int main(){
     // allocate a blank block of memory on the stack
     CPUParameters stData;
 
-    // pass that memory block to the driver to be filled
-    int iRet = pCpu->GetCPUParameters(stData);
+    std::cout << "entering background polling loop..." << std::endl;
 
-    //  Check if it succeeded (0 usually means success in low-level C APIs)
-    if (iRet == 0) { 
-        std::cout << "Current CPU Temperature: " << stData.dTemperature << " Celsius" << std::endl;
-    } else {
-        std::cout << "Failed to read CPU parameters! Error Code: " << iRet << std::endl;
+    // run infinitely
+    while (true) {
+        // pass that memory block to the driver to be filled
+        int iRet = pCpu->GetCPUParameters(stData);
+
+        // check if it succeeded (0 usually means success in low-level c APIs)
+        if (iRet == 0) { 
+            // write temperature directly into the shared RAM
+            *pSharedTemp = stData.dTemperature;
+            std::cout << "writing temperature to shared memory: " << stData.dTemperature << std::endl;
+        } else {
+            std::cout << "failed to read CPU parameters, error code: " << iRet << std::endl;
+        }
+
+        // sleep for 1000 milliseconds to prevent high CPU usage
+        Sleep(1000);
     }
 
-
+    // cleanup shared memory
+    UnmapViewOfFile(pSharedTemp);
+    CloseHandle(hMapFile);
+    
     return 0;
 
 
